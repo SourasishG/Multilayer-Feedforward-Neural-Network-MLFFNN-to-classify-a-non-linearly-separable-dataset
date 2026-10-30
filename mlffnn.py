@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 np.random.seed(42)
 X = np.random.uniform(-1, 1, (200, 2))
 y = ((X[:, 0] * X[:, 1]) > 0).astype(float).reshape(-1, 1)
-X = (X - X.mean(axis=0)) / X.std(axis=0)
+
+# Save mean and std so we can normalize custom inputs later
+mean = X.mean(axis=0)
+std = X.std(axis=0)
+X = (X - mean) / std
+
 X_train, X_test = X[:160], X[160:]
 y_train, y_test = y[:160], y[160:]
 
@@ -51,22 +56,22 @@ def run_model(h=8, act='relu'):
     # 10. Test Accuracy
     _, _, a2_test = forward(X_test, W1, b1, W2, b2, act)
     test_acc = np.mean((a2_test >= 0.5) == y_test)
-    return losses, accs, test_acc
+    return losses, accs, test_acc, (W1, b1, W2, b2)
 
 # 7. Experiment: Hidden Neurons
 print("--- 7. Hidden Neurons ---")
 for h in [2, 4, 8]:
-    _, _, acc = run_model(h=h, act='relu')
+    _, _, acc, _ = run_model(h=h, act='relu')
     print(f"Neurons {h}: Test Accuracy = {acc * 100:.1f}%")
 
 # 8. Experiment: Activation Functions
 print("\n--- 8. Activation Functions ---")
 for act in ['relu', 'sigmoid', 'tanh']:
-    _, _, acc = run_model(h=8, act=act)
+    _, _, acc, _ = run_model(h=8, act=act)
     print(f"Activation {act.upper()}: Test Accuracy = {acc * 100:.1f}%")
 
 # 9 & 10. Plot Loss/Accuracy and Final Evaluation
-losses, accs, final_acc = run_model(h=8, act='relu')
+losses, accs, final_acc, (W1, b1, W2, b2) = run_model(h=8, act='relu')
 print(f"\nFinal Test Accuracy (ReLU, 8 Neurons): {final_acc * 100:.2f}%")
 
 plt.figure(figsize=(7, 3.5))
@@ -78,3 +83,23 @@ plt.legend()
 plt.tight_layout()
 plt.savefig("training_results.png")
 print("Plot saved to 'training_results.png'")
+
+# ==============================================================
+# HOW TO TEST WITH YOUR OWN CUSTOM INPUTS:
+# Feel free to change the numbers inside the list below!
+# ==============================================================
+my_inputs = np.array([
+    [ 0.6,  0.7],  # Quadrant 1 (both > 0) -> Expected: Class 1
+    [-0.5,  0.8],  # Quadrant 2 (x1<0, x2>0) -> Expected: Class 0
+    [-0.3, -0.4],  # Quadrant 3 (both < 0) -> Expected: Class 1
+    [ 0.9, -0.2]   # Quadrant 4 (x1>0, x2<0) -> Expected: Class 0
+])
+
+# Normalize using the training mean and std
+norm_inputs = (my_inputs - mean) / std
+_, _, probs = forward(norm_inputs, W1, b1, W2, b2, 'relu')
+predictions = (probs >= 0.5).astype(int)
+
+print("\n--- Testing Custom Inputs ---")
+for pt, pred, prob in zip(my_inputs, predictions, probs):
+    print(f"Input: {pt} -> Predicted Class: {pred[0]} (Probability: {prob[0]:.4f})")
