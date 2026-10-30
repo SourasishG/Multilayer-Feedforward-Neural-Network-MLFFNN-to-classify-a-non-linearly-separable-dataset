@@ -1,44 +1,61 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 1 & 2. Dataset & Normalize (Non-linear XOR, 80/20 Train/Test split)
+# ==============================================================
+# Task 1 & 2: Generate Non-Linear XOR Dataset and Normalize
+# ==============================================================
 np.random.seed(42)
 X = np.random.uniform(-1, 1, (200, 2))
 y = ((X[:, 0] * X[:, 1]) > 0).astype(float).reshape(-1, 1)
 
-# Save mean and std so we can normalize custom inputs later
+# Standardization: (X - mean) / std
 mean = X.mean(axis=0)
 std = X.std(axis=0)
 X = (X - mean) / std
 
+# 80% Train, 20% Test split
 X_train, X_test = X[:160], X[160:]
 y_train, y_test = y[:160], y[160:]
 
-# 4. Forward Propagation
-def forward(X, W1, b1, W2, b2, act):
-    z1 = np.dot(X, W1) + b1
+# ==============================================================
+# Task 3 & 4: Forward Propagation
+# ==============================================================
+def forward(X_input, W1, b1, W2, b2, act):
+    z1 = np.dot(X_input, W1) + b1
+
+    # Hidden layer activation
     if act == 'relu':
         a1 = np.maximum(0, z1)
     elif act == 'tanh':
         a1 = np.tanh(z1)
     else:
-        a1 = 1.0 / (1.0 + np.exp(-z1))
-    a2 = 1.0 / (1.0 + np.exp(-(np.dot(a1, W2) + b2)))
+        a1 = 1.0 / (1.0 + np.exp(-z1))  # sigmoid
+
+    # Output layer (always Sigmoid for probability between 0 and 1)
+    z2 = np.dot(a1, W2) + b2
+    a2 = 1.0 / (1.0 + np.exp(-z2))
     return z1, a1, a2
 
-# 3, 5, 6. Train Network with Gradient Descent
-def run_model(h=8, act='relu'):
-    W1, b1 = np.random.randn(2, h) * 0.5, np.zeros((1, h))
-    W2, b2 = np.random.randn(h, 1) * 0.5, np.zeros((1, 1))
-    losses, accs = [], []
+# ==============================================================
+# Task 5 & 6: Backpropagation and Training with Gradient Descent
+# ==============================================================
+def run_model(neurons=8, act='relu'):
+    # Initialize weights and biases
+    W1 = np.random.randn(2, neurons) * 0.5
+    b1 = np.zeros((1, neurons))
+    W2 = np.random.randn(neurons, 1) * 0.5
+    b2 = np.zeros((1, 1))
 
+    losses = []
     for _ in range(1000):
-        # Forward pass & record metrics
+        # 1. Forward Pass
         z1, a1, a2 = forward(X_train, W1, b1, W2, b2, act)
-        losses.append(-np.mean(y_train * np.log(a2 + 1e-9) + (1 - y_train) * np.log(1 - a2 + 1e-9)))
-        accs.append(np.mean((a2 >= 0.5) == y_train))
 
-        # 5. Backpropagation & Weight Update
+        # 2. Compute Loss (Binary Cross-Entropy)
+        loss = -np.mean(y_train * np.log(a2 + 1e-9) + (1 - y_train) * np.log(1 - a2 + 1e-9))
+        losses.append(loss)
+
+        # 3. Backpropagation (Chain Rule)
         dz2 = a2 - y_train
         if act == 'relu':
             d1 = (z1 > 0).astype(float)
@@ -48,58 +65,66 @@ def run_model(h=8, act='relu'):
             d1 = a1 * (1.0 - a1)
 
         dz1 = np.dot(dz2, W2.T) * d1
+
+        # 4. Update Weights (Gradient Descent)
         W2 -= 0.1 * np.dot(a1.T, dz2) / len(X_train)
         b2 -= 0.1 * np.sum(dz2, axis=0, keepdims=True) / len(X_train)
         W1 -= 0.1 * np.dot(X_train.T, dz1) / len(X_train)
         b1 -= 0.1 * np.sum(dz1, axis=0, keepdims=True) / len(X_train)
 
-    # 10. Test Accuracy
+    # Test Accuracy
     _, _, a2_test = forward(X_test, W1, b1, W2, b2, act)
     test_acc = np.mean((a2_test >= 0.5) == y_test)
-    return losses, accs, test_acc, (W1, b1, W2, b2)
+    return losses, test_acc, (W1, b1, W2, b2)
 
-# 7. Experiment: Hidden Neurons
-print("--- 7. Hidden Neurons ---")
-for h in [2, 4, 8]:
-    _, _, acc, _ = run_model(h=h, act='relu')
-    print(f"Neurons {h}: Test Accuracy = {acc * 100:.1f}%")
+# ==============================================================
+# Task 7: Experiment with Different Hidden Neurons
+# ==============================================================
+print("--- Task 7: Effect of Hidden Neurons ---")
+for n in [2, 4, 8]:
+    _, acc, _ = run_model(neurons=n, act='relu')
+    print(f"Hidden Neurons: {n} -> Test Accuracy: {acc * 100:.1f}%")
 
-# 8. Experiment: Activation Functions
-print("\n--- 8. Activation Functions ---")
+# ==============================================================
+# Task 8: Compare Activation Functions (ReLU vs Sigmoid vs Tanh)
+# ==============================================================
+print("\n--- Task 8: Compare Activation Functions ---")
 for act in ['relu', 'sigmoid', 'tanh']:
-    _, _, acc, _ = run_model(h=8, act=act)
-    print(f"Activation {act.upper()}: Test Accuracy = {acc * 100:.1f}%")
+    _, acc, _ = run_model(neurons=8, act=act)
+    print(f"Activation: {act.upper():7s} -> Test Accuracy: {acc * 100:.1f}%")
 
-# 9 & 10. Plot Loss/Accuracy and Final Evaluation
-losses, accs, final_acc, (W1, b1, W2, b2) = run_model(h=8, act='relu')
-print(f"\nFinal Test Accuracy (ReLU, 8 Neurons): {final_acc * 100:.2f}%")
+# ==============================================================
+# Task 9: Train Final Model & Plot Training Loss Curve
+# ==============================================================
+losses, final_acc, weights = run_model(neurons=8, act='relu')
+W1, b1, W2, b2 = weights
 
-plt.figure(figsize=(7, 3.5))
-plt.plot(losses, label='Loss', color='red')
-plt.plot(accs, label='Accuracy', color='blue')
-plt.title("Training Loss & Accuracy")
+plt.figure(figsize=(6, 3))
+plt.plot(losses, color='red', linewidth=2)
+plt.title("Task 9: Training Loss over 1000 Epochs")
 plt.xlabel("Epoch")
-plt.legend()
+plt.ylabel("Loss")
+plt.grid(True)
 plt.tight_layout()
 plt.savefig("training_results.png")
-print("Plot saved to 'training_results.png'")
+print("\n--- Task 9: Plot saved to 'training_results.png' ---")
 
 # ==============================================================
-# HOW TO TEST WITH YOUR OWN CUSTOM INPUTS:
-# Feel free to change the numbers inside the list below!
+# Task 10: Final Evaluation & Easy Custom Input Testing
 # ==============================================================
-my_inputs = np.array([
-    [ 0.6,  0.7],  # Quadrant 1 (both > 0) -> Expected: Class 1
-    [-0.5,  0.8],  # Quadrant 2 (x1<0, x2>0) -> Expected: Class 0
-    [-0.3, -0.4],  # Quadrant 3 (both < 0) -> Expected: Class 1
-    [ 0.9, -0.2]   # Quadrant 4 (x1>0, x2<0) -> Expected: Class 0
-])
+print(f"--- Task 10: Final Model Test Accuracy: {final_acc * 100:.2f}% ---")
 
-# Normalize using the training mean and std
-norm_inputs = (my_inputs - mean) / std
-_, _, probs = forward(norm_inputs, W1, b1, W2, b2, 'relu')
-predictions = (probs >= 0.5).astype(int)
+def predict(x1, x2):
+    """Pass any two numbers to get the network's prediction!"""
+    pt = np.array([[x1, x2]])
+    pt_norm = (pt - mean) / std
+    _, _, a2 = forward(pt_norm, W1, b1, W2, b2, 'relu')
+    confidence = a2[0, 0]
+    predicted_class = int(confidence >= 0.5)
+    return predicted_class, confidence
 
-print("\n--- Testing Custom Inputs ---")
-for pt, pred, prob in zip(my_inputs, predictions, probs):
-    print(f"Input: {pt} -> Predicted Class: {pred[0]} (Probability: {prob[0]:.4f})")
+# Try it with custom numbers:
+print("\nTesting Custom Inputs with predict(x1, x2):")
+for x1, x2 in [(0.5, 0.5), (-0.5, 0.5), (-0.5, -0.5), (0.5, -0.5)]:
+    c, conf = predict(x1, x2)
+    print(f"predict({x1:4.1f}, {x2:4.1f}) -> Predicted Class: {c}  (Confidence: {conf*100:5.1f}%)")
